@@ -106,6 +106,11 @@ def set_wake_word(word: str):
     WAKE_WORD = word
 
 
+def recognize_command(language: str = SYSTEM_LANGUAGE, use_whisper: bool = False):
+    """Распознать команду с микрофона (google или whisper)"""
+    return recognize_microphone(language, use_whisper)
+
+
 def set_microphone(device_index):
     """Выбрать микрофон по индексу"""
     global microphone
