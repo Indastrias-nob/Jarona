@@ -86,10 +86,12 @@ def recognize_whisper(audio, model: str = "base"):
 
 def listen_for_wake_word(timeout=5, use_whisper: bool = False):
     """Слушать слово пробуждения"""
-    with microphone as source:
-        setup_audio()
+    with sr.Microphone() as source:
+        with source as src:
+            logger.info("Настройка уровней аудио...")
+            recognizer.adjust_for_ambient_noise(src, duration=1)
         try:
-            audio = recognizer.listen(source, timeout=timeout)
+            audio = recognizer.listen(src, timeout=timeout)
             word = recognizer.recognize_google(audio, language="ru")
             logger.info(f"Распознано для пробуждения: {word}")
             if word and WAKE_WORD.lower() in word.lower():
