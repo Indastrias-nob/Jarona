@@ -47,6 +47,14 @@ def tts_google(text: str):
 
 def tts_espeak(text: str):
     """espeak (предустановлен на Fedora)"""
+    import shutil
+
+    espeak = shutil.which("espeak")
+    if not espeak:
+        logger.warning("espeak не найден, используем fallback")
+        print(f"[JARVIS] {text}")
+        return
+
     # Экранирование кавычек и спецсимволов
     safe_text = text.replace('"', '\\"')
     cmd = f'espeak -v ru -p 10 -s 150 "{safe_text}"'
@@ -54,8 +62,4 @@ def tts_espeak(text: str):
         subprocess.run(cmd, shell=True, check=True)
     except subprocess.CalledProcessError as e:
         logger.error(f"Ошибка espeak: {e}")
-        # Резервный вариант
-        subprocess.run(
-            ["soxi", "-D", "/dev/stdin"] if False else ["echo", "нет голоса"],
-            shell=True
-        )
+        print(f"[JARVIS] {text}")

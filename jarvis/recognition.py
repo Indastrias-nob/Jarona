@@ -86,19 +86,21 @@ def recognize_whisper(audio, model: str = "base"):
 
 def listen_for_wake_word(timeout=5, use_whisper: bool = False):
     """Слушать слово пробуждения"""
-    setup_audio()
-    try:
-        audio = recognizer.listen(microphone, timeout=timeout)
-        word = recognizer.recognize_google(audio, language="ru")
-        if word and "jarvis" in word.lower():
-            logger.info("Слово пробуждения обнаружено")
+    with microphone as source:
+        setup_audio()
+        try:
+            audio = recognizer.listen(source, timeout=timeout)
+            word = recognizer.recognize_google(audio, language="ru")
+            logger.info(f"Распознано для пробуждения: {word}")
+            if word and WAKE_WORD.lower() in word.lower():
+                logger.info("Слово пробуждения обнаружено")
+                return None
             return None
-        return None
-    except sr.WaitTimeoutError:
-        return None
-    except Exception as e:
-        logger.error(f"Ошибка проверки пробуждения: {e}")
-        return None
+        except sr.WaitTimeoutError:
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка проверки пробуждения: {e}")
+            return None
 
 
 def set_wake_word(word: str):
