@@ -11,6 +11,9 @@ from config import (
     TTS_ENGINE, TTS_LANGUAGE, WAKE_WORD_ENABLED,
     WAKE_WORD, TMP_DIR, DEFAULT_VOLUME
 )
+import sys
+sys.path.insert(0, sys.path[0])
+
 from recognition import recognize_command, listen_for_wake_word
 from tts import speak
 from pc_control import *
