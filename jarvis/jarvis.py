@@ -16,6 +16,8 @@ from tts import speak
 from pc_control import *
 from file_ops import *
 from voice_input import voice_input_text
+from llm import understand
+from context import append_message, clear_dialogue
 
 logging.basicConfig(
     level=logging.INFO,
@@ -109,6 +111,8 @@ def main():
                 continue
 
             print(f"👉 Вы: {command}")
+            # Сохраняем сообщение в контекст диалога
+            append_message("user", command)
             keep_running = process_command(command)
             if not keep_running:
                 print("До свидания!")
