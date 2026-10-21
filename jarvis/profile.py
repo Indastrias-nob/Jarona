@@ -6,14 +6,15 @@
 import os
 import json
 import logging
-from config import PROFILE_PATH, TMP_DIR
+from datetime import datetime
+from config import DATA_DIR, PROFILE_PATH
 
 logger = logging.getLogger(__name__)
 
 
 def load_profile():
     """Загрузить профиль из файла или создать новый"""
-    os.makedirs(TMP_DIR, exist_ok=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
     if os.path.exists(PROFILE_PATH):
         try:
             with open(PROFILE_PATH, "r", encoding="utf-8") as f:
@@ -37,9 +38,10 @@ def load_profile():
 
 def save_profile(profile: dict):
     """Сохранить профиль в файл"""
-    profile["last_active"] = __import__("datetime").datetime.now().isoformat()
+    profile["last_active"] = datetime.now().isoformat()
     profile["history_count"] = profile.get("history_count", 0) + 1
     try:
+        os.makedirs(DATA_DIR, exist_ok=True)
         with open(PROFILE_PATH, "w", encoding="utf-8") as f:
             json.dump(profile, f, ensure_ascii=False, indent=2)
         logger.info("Профиль сохранён")

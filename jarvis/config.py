@@ -1,44 +1,93 @@
 # Настройки голосового помощника Jarvis
+"""Конфигурация Jarvis.
 
-# API ключ для распознавания речи (Google Speech Recognition - бесплатно через веб)
-# Альтернатива: Whisper API
-GPT_API_KEY = ""
+Значения можно переопределять переменными окружения:
+  OPENROUTER_API_KEY, OPENROUTER_MODEL, JARVIS_MIC, JARVIS_DATA_DIR
+"""
 
-# --- OpenRouter настройки ---
-OPENROUTER_API_KEY = ""  # ключ get started на https://openrouter.ai
-OPENROUTER_MODEL = "google/gemma-4-31b-it:free"
+import os
+from pathlib import Path
+
+# --- OpenRouter (понимание команд через LLM) ---
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.environ.get(
+    "OPENROUTER_MODEL", "google/gemma-4-31b-it:free"
+)
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+LLM_TIMEOUT = 30
+LLM_MAX_RETRIES = 1
+# Если LLM недоступна, команда считается нераспознанной
+USE_LLM = True
 
 # --- Голосовой ответ ---
-TTS_ENGINE = "espeak"
+# auto: espeak-ng -> espeak -> gTTS -> вывод в консоль
+TTS_ENGINE = os.environ.get("JARVIS_TTS", "auto")  # auto | espeak | gtts
 TTS_LANGUAGE = "ru"
+TTS_RATE = 150
+TTS_PITCH = 40
 
-# --- Режим просыпания ---
+# --- Распознавание речи ---
+SYSTEM_LANGUAGE = "ru-RU"
+LISTEN_TIMEOUT = 5          # сколько ждать начала фразы, сек
+PHRASE_TIME_LIMIT = 10      # максимум длительность фразы, сек
+CALIBRATION_SECONDS = 0.8   # калибровка шума при старте/смене устройства
+MIC_DEVICE = os.environ.get("JARVIS_MIC", "")  # индекс или часть имени
+
+# --- Слово пробуждения ---
 WAKE_WORD_ENABLED = True
 WAKE_WORD = "jarvis"
+# Варианты распознавания (Google часто пишет кириллицей)
+WAKE_WORD_ALIASES = (
+    "jarvis", "jervis", "jarves",
+    "джарвис", "жарвис", "джервис", "джарвіс",
+)
 
 # --- Громкость ---
 DEFAULT_VOLUME = 0.8
+VOLUME_STEP = 10
 
 # --- Пути ---
-TMP_DIR = "/tmp/jarvis"
-PROFILE_PATH = "/tmp/jarvis/user_profile.json"
-DIALOGUE_PATH = "/tmp/jarvis/dialogue.json"
+DATA_DIR = os.path.expanduser(
+    os.environ.get("JARVIS_DATA_DIR", "~/.local/share/jarvis")
+)
+TMP_DIR = os.environ.get("JARVIS_TMP", "/tmp/jarvis")
+PROFILE_PATH = os.path.join(DATA_DIR, "user_profile.json")
+DIALOGUE_PATH = os.path.join(DATA_DIR, "dialogue.json")
+LOG_PATH = os.path.join(DATA_DIR, "jarvis.log")
 MAX_CONTEXT = 10  # макс. число сообщений в контексте
 
-# --- Язык ---
-SYSTEM_LANGUAGE = "ru-RU"
+# --- Безопасность ---
+# Файловые операции (создание/удаление) разрешены только внутри этих каталогов.
+# Пустой список = разрешён весь домашний каталог.
+ALLOWED_FILE_ROOTS = [os.path.expanduser("~")]
+# Удаление подтверждается голосом/вводом, если включено
+CONFIRM_DELETE = True
 
 # --- Системная подсказка для LLM ---
 SYSTEM_PROMPT = (
-    "Ты — голосовой помощник Jarvis, работающий на Linux (Fedora). "
-    "Пользователь говорит с тобой голосом на русском языке. "
-    "Твоя задача — понять намерение пользователя и вернуть краткий JSON-объект "
-    "с ключом 'intent' (одна из команд: open_browser, open_terminal, open_app, "
-    "create_file, edit_file, format_text, delete_file, volume, screenshot, "
-    "window_list, media_control, search_web, answer, voice_input, exit, help), "
-    "ключом 'args' (объект с параметрами, либо пустой объект) и ключом 'answer' "
-    "(текст ответа, если нужно что-то объяснить). Будь краток. Если команда не ясна, "
-    "верни intent 'answer' с вопросом уточнения. "
-    "Ответь ТОЛЬКО на русском языке, даже если пользователь говорит по-английски."
+    "Ты — голосовой помощник Jarvis на Linux (Fedora) и говоришь по-русски. "
+    "Пользователь даёт команду голосом. Определи намерение и верни ТОЛЬКО "
+    "JSON-объект без пояснений и markdown в формате:\n"
+    '{"intent": "<команда>", "args": {...}, "answer": "<краткий ответ>"}\n'
+    "Допустимые intent и args:\n"
+    '  open_app       args: {"app": "<имя программы или сайта>"}\n'
+    "  open_browser   args: {}\n"
+    "  open_terminal  args: {}\n"
+    '  create_file    args: {"path": "<путь>", "content": "<содержимое>"}\n'
+    '  open_file      args: {"path": "<путь>"}\n'
+    '  delete_file    args: {"path": "<путь>"}\n'
+    '  format_text    args: {"action": "<upper|lower|title>"}\n'
+    '  volume         args: {"volume": <0-100>} или {"delta": <число>} '
+    'или {"mute": true}\n'
+    "  screenshot     args: {}\n"
+    "  window_list    args: {}\n"
+    '  media_control  args: {"action": "<play_pause|next|prev|stop>"}\n'
+    '  search_web     args: {"query": "<запрос>"}\n'
+    "  voice_input    args: {}\n"
+    "  help           args: {}\n"
+    "  exit           args: {}\n"
+    '  answer         args: {} — вопрос или реплика, ответь полем "answer"\n'
+    "Все пути — абсолютные, начинающиеся с ~ или /home. "
+    "Если намерение неясно — intent answer с уточняющим вопросом. "
+    "Ответ всегда на русском языке."
 )
