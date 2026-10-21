@@ -34,7 +34,7 @@ import pc_control  # noqa: E402
 import recognition  # noqa: E402
 import tts  # noqa: E402
 import voice_input  # noqa: E402
-from llm import understand  # noqa: E402
+from llm import check_llm, understand  # noqa: E402
 from tts import speak  # noqa: E402
 
 logger = logging.getLogger("jarvis")
@@ -168,6 +168,10 @@ def handle_llm_result(result: dict) -> bool:
     intent = result.get("intent", "answer")
     args = result.get("args") or {}
     answer = result.get("answer", "")
+
+    if intent == "busy":
+        _say("Сервис распознавания перегружен, попробуйте через минуту.")
+        return True
 
     if intent == "error":
         _say("Не удалось связаться с языковой моделью.")
@@ -322,6 +326,8 @@ def main(argv=None, tts_enabled=True) -> int:
     parser.add_argument("--mic", help="микрофон: индекс или часть имени")
     parser.add_argument("--list-mics", action="store_true",
                         help="показать доступные микрофоны и выйти")
+    parser.add_argument("--check-llm", action="store_true",
+                        help="проверить доступность OpenRouter и выйти")
     parser.add_argument("--verbose", "-v", action="store_true", help="подробный лог")
     args = parser.parse_args(argv)
 
@@ -332,6 +338,11 @@ def main(argv=None, tts_enabled=True) -> int:
         for i, name in enumerate(recognition.list_microphones()):
             print(f"{i}: {name}")
         return 0
+
+    if args.check_llm:
+        ok, message = check_llm()
+        print(("✅ " if ok else "❌ ") + message)
+        return 0 if ok else 1
 
     if args.no_tts:
         tts_enabled = False
@@ -363,7 +374,8 @@ def main(argv=None, tts_enabled=True) -> int:
             if not command:
                 continue
 
-            print(f"👉 Вы: {command}")
+            if not args.text:  # в текстовом режиме строку уже напечатал input()
+                print(f"👉 Вы: {command}")
             if not process_command(command):
                 break
     except KeyboardInterrupt:

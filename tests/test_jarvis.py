@@ -184,6 +184,87 @@ class TestContext(unittest.TestCase):
         self.assertEqual(context.load_dialogue(), [])
 
 
+class TestLlmFallback(unittest.TestCase):
+    """Перебор моделей и повторы при перегрузке (429)."""
+
+    def setUp(self):
+        patcher = mock.patch.object(llm, "OPENROUTER_API_KEY", "test-key")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        sleep_patcher = mock.patch.object(llm.time, "sleep")
+        self.sleep = sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
+
+    @staticmethod
+    def _response(status_code, payload=None, headers=None):
+        response = mock.Mock()
+        response.status_code = status_code
+        response.headers = headers or {}
+        response.json.return_value = payload or {}
+        response.text = json.dumps(payload or {})
+        return response
+
+    def _chat_response(self, content):
+        return self._response(200, {"choices": [{"message": {"content": content}}]})
+
+    def test_model_order_has_no_duplicates(self):
+        models = llm._models()
+        self.assertEqual(len(models), len(set(models)))
+        self.assertEqual(models[0], config.OPENROUTER_MODEL)
+
+    def test_retry_after_header_is_used(self):
+        response = self._response(429, headers={"Retry-After": "7"})
+        self.assertEqual(llm._retry_after(response, attempt=0), 7.0)
+
+    def test_missing_api_key_reported(self):
+        with mock.patch.object(llm, "OPENROUTER_API_KEY", ""):
+            with self.assertRaises(llm.LLMError) as ctx:
+                llm.ask_llm([{"role": "user", "content": "привет"}])
+        self.assertIn("OPENROUTER_API_KEY", str(ctx.exception))
+
+    def test_retry_after_is_capped(self):
+        response = self._response(429, headers={"Retry-After": "999"})
+        self.assertEqual(llm._retry_after(response, attempt=0), 30.0)
+
+    def test_falls_back_to_next_model_on_429(self):
+        busy = self._response(429, {"error": "rate limited"})
+        ok = self._chat_response('{"intent": "help", "args": {}}')
+        with mock.patch.object(llm.requests, "post", side_effect=[busy, ok]) as post:
+            result = llm.ask_llm([{"role": "user", "content": "помощь"}])
+        self.assertEqual(result["intent"], "help")
+        self.assertEqual(post.call_count, 2)  # первая модель упала, вторая ответила
+
+    def test_all_models_busy_raises_busy_error(self):
+        busy = self._response(429, {"error": "rate limited"})
+        with mock.patch.object(llm, "LLM_MAX_RETRIES", 0), \
+             mock.patch.object(llm, "OPENROUTER_MODEL", "m1"), \
+             mock.patch.object(llm, "OPENROUTER_FALLBACK_MODELS", ["m2"]), \
+             mock.patch.object(llm.requests, "post", return_value=busy):
+            with self.assertRaises(llm.LLMBusyError):
+                llm.ask_llm([{"role": "user", "content": "привет"}])
+
+    def test_understand_reports_busy(self):
+        with mock.patch.object(llm, "ask_llm", side_effect=llm.LLMBusyError("429")):
+            result = llm.understand("привет")
+        self.assertEqual(result["intent"], "busy")
+
+    def test_empty_choices_reported(self):
+        empty = self._response(200, {"choices": []})
+        with mock.patch.object(llm, "LLM_MAX_RETRIES", 0), \
+             mock.patch.object(llm, "OPENROUTER_FALLBACK_MODELS", []), \
+             mock.patch.object(llm.requests, "post", return_value=empty):
+            with self.assertRaises(llm.LLMError) as ctx:
+                llm.ask_llm([{"role": "user", "content": "привет"}])
+        self.assertIn("choices", str(ctx.exception))
+
+    def test_bad_api_key_reported_without_request(self):
+        with mock.patch.object(llm, "OPENROUTER_API_KEY", ""), \
+             mock.patch.object(llm.requests, "post") as post:
+            with self.assertRaises(llm.LLMError):
+                llm.ask_llm([{"role": "user", "content": "привет"}])
+        post.assert_not_called()  # без ключа запрос не уходит
+
+
 class TestCli(unittest.TestCase):
     def test_help_and_exit_in_text_mode(self):
         env = dict(os.environ, JARVIS_TMP=tempfile.mkdtemp(),

@@ -29,6 +29,7 @@ python3 jarvis/jarvis.py
 | `--no-tts` | не озвучивать ответы |
 | `--mic N` | выбрать микрофон (индекс или часть имени) |
 | `--list-mics` | показать доступные микрофоны |
+| `--check-llm` | проверить доступность OpenRouter и выйти |
 | `-v` | подробный лог (`~/.local/share/jarvis/jarvis.log`) |
 
 ## Как это работает
@@ -83,10 +84,31 @@ tests/
 | Переменная | Значение |
 |---|---|
 | `OPENROUTER_API_KEY` | ключ OpenRouter |
-| `OPENROUTER_MODEL` | модель (по умолчанию бесплатная gemma) |
+| `OPENROUTER_MODEL` | модель (по умолчанию `minimax/minimax-m3.1-flash:free`) |
 | `JARVIS_MIC` | микрофон (индекс или часть имени) |
 | `JARVIS_DATA_DIR` | каталог данных (по умолчанию `~/.local/share/jarvis`) |
 | `JARVIS_TTS` | `auto` / `espeak` / `gtts` |
+
+## Модели и устойчивость к сбоям
+
+Бесплатные модели OpenRouter часто отдают `429 Too Many Requests`. Jarvis:
+
+- повторяет запрос с паузой (учитывает заголовок `Retry-After`);
+- перебирает резервные модели из `OPENROUTER_FALLBACK_MODELS`;
+- отвечает «Сервис распознавания перегружен, попробуйте через минуту» вместо
+  непонятной ошибки.
+
+Модель по умолчанию — `minimax/minimax-m3.1-flash:free`; резервные —
+`poolside/laguna-s-2.1:free`, `dots-studio/dots-3-note-preview:free`,
+`google/gemma-4-31b-it:free`. Если модель не отвечает или возвращает пустой
+ответ, она пропускается. Проверить связку целиком:
+
+```bash
+python3 jarvis/jarvis.py --check-llm
+```
+
+Список бесплатных моделей меняется — посмотреть актуальные:
+`curl -s https://openrouter.ai/api/v1/models | grep ':free'`.
 
 ## Тесты
 

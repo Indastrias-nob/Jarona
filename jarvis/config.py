@@ -11,11 +11,20 @@ from pathlib import Path
 # --- OpenRouter (понимание команд через LLM) ---
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get(
-    "OPENROUTER_MODEL", "google/gemma-4-31b-it:free"
+    "OPENROUTER_MODEL", "minimax/minimax-m3.1-flash:free"
 )
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 LLM_TIMEOUT = 30
-LLM_MAX_RETRIES = 1
+LLM_MAX_RETRIES = 1          # повторов на одну модель
+LLM_BACKOFF_BASE = 1.5       # база экспоненциальной паузы, сек
+# Если основная модель недоступна (429/ошибка), пробуем эти по очереди.
+# Проверено вручную: эти бесплатные модели отвечают чистым JSON.
+# google/gemma-*:free часто отдаёт 429 (rate-limited upstream) — держим в конце.
+OPENROUTER_FALLBACK_MODELS = [
+    "poolside/laguna-s-2.1:free",
+    "dots-studio/dots-3-note-preview:free",
+    "google/gemma-4-31b-it:free",
+]
 # Если LLM недоступна, команда считается нераспознанной
 USE_LLM = True
 
