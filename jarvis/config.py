@@ -15,6 +15,7 @@ OPENROUTER_MODEL = os.environ.get(
 )
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 LLM_TIMEOUT = 30
+LLM_MAX_TOKENS = 1200        # с запасом: reasoning-модели тратят токены на «мышление»
 LLM_MAX_RETRIES = 1          # повторов на одну модель
 LLM_BACKOFF_BASE = 1.5       # база экспоненциальной паузы, сек
 # Если основная модель недоступна (429/ошибка), пробуем эти по очереди.
@@ -82,10 +83,16 @@ SYSTEM_PROMPT = (
     '  open_app       args: {"app": "<имя программы или сайта>"}\n'
     "  open_browser   args: {}\n"
     "  open_terminal  args: {}\n"
-    '  create_file    args: {"path": "<путь>", "content": "<содержимое>"}\n'
+    '  create_file    args: {"path": "<путь>", "content": "<содержимое>"} — '
+    "новый файл, существующий НЕ перезаписывается\n"
+    '  write_file     args: {"path": "<путь>", "content": "<содержимое>", '
+    '"append": <true|false>} — записать или дописать в файл; используй, '
+    "когда просят «напиши в файл», «добавь в файл», «сохрани в файл»\n"
+    '  read_file      args: {"path": "<путь>"} — прочитать и показать файл\n'
     '  open_file      args: {"path": "<путь>"}\n'
+    '  open_folder    args: {"path": "<путь>"} — открыть папку в файловом менеджере\n'
     '  delete_file    args: {"path": "<путь>"}\n'
-    '  format_text    args: {"action": "<upper|lower|title>"}\n'
+    '  format_text    args: {"action": "<upper|lower|title>", "path": "<путь>"}\n'
     '  volume         args: {"volume": <0-100>} или {"delta": <число>} '
     'или {"mute": true}\n'
     "  screenshot     args: {}\n"
@@ -96,7 +103,11 @@ SYSTEM_PROMPT = (
     "  help           args: {}\n"
     "  exit           args: {}\n"
     '  answer         args: {} — вопрос или реплика, ответь полем "answer"\n'
-    "Все пути — абсолютные, начинающиеся с ~ или /home. "
+    "Пути: ~ разворачивается в домашний каталог, «в папке ~/» — это ~/, "
+    "например «файл rt.py в ~/» = ~/rt.py.\n"
+    "ВАЖНО: твой ответ — ровно один JSON-объект и ничего больше. "
+    "Не пиши рассуждений, не используй ``` и не добавляй текст до или после JSON. "
+    "Если просят написать код — положи код строкой в поле content.\n"
     "Если намерение неясно — intent answer с уточняющим вопросом. "
     "Ответ всегда на русском языке."
 )

@@ -53,6 +53,34 @@ class TestExtractJson(unittest.TestCase):
         with self.assertRaises(llm.LLMError):
             llm.extract_json("")
 
+    def test_json_inside_reasoning_text(self):
+        """Модель объясняет по-английски, но JSON внутри есть."""
+        text = (
+            "We need output JSON only. User says open folder ~. So intent is: "
+            '{"intent": "open_folder", "args": {"path": "~/"}, "answer": "Открываю"}'
+        )
+        result = llm.extract_json(text)
+        self.assertEqual(result["intent"], "open_folder")
+
+    def test_python_style_dict(self):
+        self.assertEqual(
+            llm.extract_json("{'intent': 'help', 'args': {}}")["intent"], "help"
+        )
+
+    def test_capitalized_true_false(self):
+        result = llm.extract_json(
+            '{"intent": "write_file", "args": {"path": "~/a", "append": False}}'
+        )
+        self.assertIs(result["args"]["append"], False)
+
+    def test_fence_with_python_code_and_json(self):
+        """В блоке кода — текст на Python, ниже корректный JSON."""
+        content = (
+            "```python\nprint('привет')\n```\n"
+            '{"intent": "create_file", "args": {"path": "~/rt.py", "content": "x"}}'
+        )
+        self.assertEqual(llm.extract_json(content)["intent"], "create_file")
+
 
 class TestNormalizeResult(unittest.TestCase):
     def test_unknown_intent_becomes_answer(self):
@@ -149,6 +177,30 @@ class TestFileSafety(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             self.assertEqual(f.read(), "ПРИВЕТ МИР")
 
+    def test_write_file_overwrites(self):
+        path = os.path.join(self.root, "code.py")
+        file_ops.create_file(path, "старое")
+        self.assertEqual(file_ops.write_file(path, "новое"), path)
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "новое")
+
+    def test_write_file_appends(self):
+        path = os.path.join(self.root, "log.txt")
+        file_ops.write_file(path, "первая")
+        file_ops.write_file(path, "вторая", append=True)
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "первая\nвторая")
+
+    def test_write_and_read_roundtrip(self):
+        path = os.path.join(self.root, "calc.py")
+        code = "print('калькулятор')\n"
+        file_ops.write_file(path, code)
+        self.assertEqual(file_ops.read_file(path), code)
+
+    def test_write_outside_root_rejected(self):
+        self.assertIsNone(file_ops.write_file("/etc/jarvis_hack.txt", "x"))
+        self.assertFalse(os.path.exists("/etc/jarvis_hack.txt"))
+
 
 class TestContext(unittest.TestCase):
     def setUp(self):
@@ -234,6 +286,24 @@ class TestLlmFallback(unittest.TestCase):
         self.assertEqual(result["intent"], "help")
         self.assertEqual(post.call_count, 2)  # первая модель упала, вторая ответила
 
+    def test_json_object_requested_with_token_budget(self):
+        """response_format просим всегда, а бюджет токенов хватает на рассуждения."""
+        ok = self._chat_response('{"intent": "help", "args": {}}')
+        with mock.patch.object(llm.requests, "post", return_value=ok) as post:
+            llm.ask_llm([{"role": "user", "content": "помощь"}])
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual(payload["response_format"], {"type": "json_object"})
+        self.assertGreaterEqual(payload["max_tokens"], 1000)
+
+    def test_retries_without_response_format_on_400(self):
+        """Модель без поддержки response_format — повторяем без этого поля."""
+        bad = self._response(400, {"error": "response_format not supported"})
+        ok = self._chat_response('{"intent": "help", "args": {}}')
+        with mock.patch.object(llm.requests, "post", side_effect=[bad, ok]) as post:
+            self.assertEqual(llm.ask_llm([{"role": "user", "content": "x"}])["intent"], "help")
+        self.assertIn("response_format", post.call_args_list[0].kwargs["json"])
+        self.assertNotIn("response_format", post.call_args_list[1].kwargs["json"])
+
     def test_all_models_busy_raises_busy_error(self):
         busy = self._response(429, {"error": "rate limited"})
         with mock.patch.object(llm, "LLM_MAX_RETRIES", 0), \
@@ -291,7 +361,8 @@ class TestCli(unittest.TestCase):
             timeout=60, env=env, cwd=tempfile.gettempdir(),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Не удалось связаться", result.stdout)
+        self.assertIn("Не удалось понять команду", result.stdout)
+        self.assertIn("OPENROUTER_API_KEY", result.stdout)
 
 
 if __name__ == "__main__":

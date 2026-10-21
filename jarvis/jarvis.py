@@ -45,6 +45,7 @@ BANNER = """
 ║       Управление ПК • Голосовой ввод   ║
 ╚════════════════════════════════════════╝
  - «джарвис, открой браузер» — команды голосом
+ - «напиши в файл ~/rt.py калькулятор» — работа с файлами
  - «слушай»            — голосовой ввод текста в окно
  - «помощь»            — список команд
  - «выход»             — завершение
@@ -58,7 +59,9 @@ HELP_TEXT = """Команды Jarvis:
   что открыто
   пауза / следующий трек
   создай файл <путь>
+  допиши в файл <путь> — записать или дописать текст
   открой файл <путь>
+  открой папку <путь>
   удали файл <путь>
   сделай текст заглавными <путь>
   слушай — голосовой ввод текста в активное окно
@@ -174,7 +177,8 @@ def handle_llm_result(result: dict) -> bool:
         return True
 
     if intent == "error":
-        _say("Не удалось связаться с языковой моделью.")
+        _say("Не удалось понять команду: модель вернула неожиданный ответ.")
+        logger.error("Детали: %s", answer)
         if not config.OPENROUTER_API_KEY:
             print("Подсказка: задайте OPENROUTER_API_KEY, например:")
             print("  export OPENROUTER_API_KEY=sk-or-...")
@@ -223,14 +227,32 @@ def handle_llm_result(result: dict) -> bool:
         _say(answer or (f"Ищу: {query}" if ok else "Не удалось открыть поиск"))
         return True
 
-    if intent in ("create_file", "open_file", "delete_file", "format_text"):
+    if intent in ("create_file", "write_file", "read_file", "open_file",
+                  "open_folder", "delete_file", "format_text"):
         path = args.get("path")
         if not path:
             _say("Не указан путь к файлу")
             return True
         if intent == "create_file":
             ok = file_ops.create_file(path, args.get("content", ""))
-            _say(f"Файл создан: {ok}" if ok else "Не удалось создать файл")
+            _say(f"Файл создан: {ok}" if ok else
+                 f"Файл {path} уже существует — скажите «допиши в файл», "
+                 "чтобы изменить его")
+        elif intent == "write_file":
+            ok = file_ops.write_file(
+                path, args.get("content", ""), append=bool(args.get("append"))
+            )
+            _say(f"Записано в {ok}" if ok else "Не удалось записать файл")
+        elif intent == "read_file":
+            text = file_ops.read_file(path)
+            if text is None:
+                _say("Не удалось прочитать файл")
+            else:
+                print(f"📄 {path}:\n{text}")
+                _say(answer or f"Файл содержит {len(text)} символов")
+        elif intent == "open_folder":
+            ok = pc_control.open_folder(path)
+            _say(answer or (f"Открываю папку {ok}" if ok else "Папка не найдена"))
         elif intent == "open_file":
             ok = file_ops.open_file(path)
             _say(f"Открываю {path}" if ok else "Файл не найден")

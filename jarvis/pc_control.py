@@ -176,6 +176,35 @@ def search_web(query: str):
     return open_url(url)
 
 
+def open_folder(path: str):
+    """Открыть каталог в файловом менеджере по умолчанию."""
+    if not path:
+        return None
+    target = os.path.abspath(os.path.expanduser(path))
+    if not os.path.isdir(target):
+        logger.error("Каталог не найден: %s", target)
+        return None
+    if _has("xdg-open"):
+        try:
+            subprocess.Popen(
+                ["xdg-open", target],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            logger.info("Открыт каталог: %s", target)
+            return target
+        except OSError as e:
+            logger.error("Не удалось открыть каталог %s: %s", target, e)
+            return None
+    for manager in ("nautilus", "dolphin", "thunar", "nemo"):
+        if _has(manager):
+            subprocess.Popen([manager, target], start_new_session=True)
+            return target
+    logger.error("Файловый менеджер не найден")
+    return None
+
+
 def open_url(url: str):
     """Открыть URL в браузере по умолчанию."""
     if not url.startswith(_URL_PREFIXES):

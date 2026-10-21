@@ -105,6 +105,26 @@ def open_file(path: str):
         return False
 
 
+def write_file(path: str, content: str = "", append: bool = False):
+    """Записать или дописать текст в файл. Возвращает путь или None."""
+    try:
+        path = _require_allowed(path)
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        existed = os.path.exists(path)
+        mode = "a" if append else "w"
+        with open(path, mode, encoding="utf-8") as f:
+            prefix = "\n" if append and existed and os.path.getsize(path) else ""
+            f.write(prefix + content)
+        action = "дописан" if append else "записан"
+        logger.info("Файл %s: %s", action, path)
+        return path
+    except (UnsafePathError, OSError, ValueError) as e:
+        logger.error("Ошибка записи файла: %s", e)
+        return None
+
+
 def read_file(path: str, max_chars: int = 4000):
     """Прочитать текстовый файл (для LLM)."""
     try:
