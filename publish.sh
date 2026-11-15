@@ -30,6 +30,18 @@ fi
 
 echo ""
 echo "📤 Push ветки jarona-v0.1.0..."
+echo ""
+echo "⚠️  ВАЖНО: GitHub требует Personal Access Token (PAT)"
+echo "Если push не работает:"
+echo "  1. Создайте токен: https://github.com/settings/tokens"
+echo "  2. Выберите scope: repo"
+echo "  3. При запросе пароля введите токен"
+echo ""
+echo "Или переключитесь на SSH:"
+echo "  git remote set-url origin git@github.com:Indastrias-nob/Jarona.git"
+echo ""
+read -p "Нажмите Enter для продолжения..."
+
 git push -u origin jarona-v0.1.0
 
 echo ""
