@@ -1,0 +1,27 @@
+# Jarona Server — зависимости для Orange Pi (DietPi)
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+pydantic>=2.5.0
+
+# HTTP клиент
+requests>=2.31.0
+
+# Распознавание речи (Vosk)
+vosk>=0.3.45
+sounddevice>=0.4.6
+
+# Синтез речи (опционально)
+# gTTS>=2.5.1
+
+# GPIO для Orange Pi
+# gpiod>=2.0  # требует libgpiod-dev
+# lgpio>=0.2.2.0
+
+# Системная информация
+psutil>=5.9.0
+
+# Утилиты
+python-dotenv>=1.0.0

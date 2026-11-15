@@ -1,0 +1,18 @@
+# Jarona Client — зависимости для Windows ПК
+
+# WebSocket клиент
+websockets>=12.0
+
+# Управление Windows
+pywin32>=306
+pycaw>=20231129
+comtypes>=1.2.0
+
+# Скриншоты
+Pillow>=10.1.0
+
+# Утилиты
+python-dotenv>=1.0.0
+
+# Pydantic для моделей
+pydantic>=2.5.0

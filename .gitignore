@@ -1,7 +1,67 @@
-.aider*
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
-.venv/
+.installed.cfg
+*.egg
+
+# Virtual environments
 venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Data
+/var/lib/jarona/
+*.sqlite
+*.db
+
+# Config
 .env
+.env.local
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vosk models (большие файлы)
+jarona/server/models/vosk-*
+/opt/jarona/models/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# Screenshots
+screenshot_*.png
